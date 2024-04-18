@@ -2,87 +2,138 @@ const mongoose = require('mongoose');
 const Trip = require('../models/travlr'); // Check if this is the correct import path
 const Model = mongoose.model('trips');
 
-const tripsList = async (req, res) => {
-    try {
-        const q = await Model.find({}).exec();
-        return res.status(200).json(q);
-    } catch (err) {
-        return res.status(500).json({ error: err.message });
+const getUser = (req, res, callback) => {
+    if (req.payload && req.payload.email) {       
+      User
+        .findOne({ email : req.payload.email })    
+        .exec((err, user) => {
+          if (!user) {
+            return res
+              .status(404)
+              .json({"message": "User not found"});
+          } else if (err) {
+            console.log(err);
+            return res
+              .status(404)
+              .json(err);
+           }
+          callback(req, res, user.name);        
+         });
+    } else {
+      return res
+        .status(404)
+        .json({"message": "User not found"});
     }
+  };
+
+// GET: /trips - lists all the trips
+const tripsList = async (req, res) => {
+    Model
+        .find({}) // empty filter for all
+        .exec((err, trips) => {
+            if (!trips) {
+                return res
+                        .status(404)
+                        .json({"message": "trips not found"});
+            } else if (err) {
+                return res
+                        .status(404)
+                        .json(err);
+            } else {
+                return res
+                        .status(200)
+                        .json(trips);
+            }
+        });
 };
 
+// GET: /trips:/tripCode - returns single trip
 const tripsFindByCode = async (req, res) => {
-    try {
-        const q = await Model.find({ 'code': req.params.tripCode }).exec();
-        if (!q || q.length === 0) {
-            return res.status(404).json({ error: 'Trip not found' });
-        }
-        return res.status(200).json(q);
-    } catch (err) {
-        return res.status(500).json({ error: err.message });
-    }
+    Model
+        .find({"code": req.params.tripCode })
+        .exec((err, trip) => {
+            if (!trip) {
+                return res
+                        .status(404)
+                        .json({ "message": "trip not found" });
+            } else if (err) {
+                return res
+                        .status(404)
+                        .json(err);
+            } else {
+                return res
+                        .status(200)
+                        .json(trip);
+            }
+        });
 };
 
 const tripsAddTrip = async (req, res) => {
-    try {
-        const newTrip = new Model({
-            code: req.body.code,
-            name: req.body.name,
-            length: req.body.length,
-            start: req.body.start,
-            resort: req.body.resort,
-            perPerson: req.body.perPerson,
-            image: req.body.image,
-            description: req.body.description
-        });
-
-        const q = await newTrip.save();
-        return res.status(201).json(q);
-    } catch (err) {
-        return res.status(400).json({ error: err.message });
+    getUser(req, res,
+        (req, res) => {
+            Model
+    .create({
+        code: req.body.code,
+        name: req.body.name,
+        length: req.body.length,
+        start: req.body.start,
+        resort: req.body.resort,
+        perPerson: req.body.perPerson,
+        image: req.body.image,
+        description: req.body.description
+    },
+    (err, trip) => {
+        if (err) {
+            return res
+                .status(400)
+                .json(err);
+        } else {
+            return res
+                .status(201)
+                .json(trip);
+        }
     }
-};
+    );
+});
+}
 
-// PUT: /trips/:tripCode - Adds a new Trip
-// Regardless of outcome, response must include HTML status code
-// and JSON message to the requesting client
 const tripsUpdateTrip = async (req, res) => {
-    // Uncomment for debugging
-    console.log(req.params);
-    console.log(req.body);
-    const q = await Model
-        .findOneAndUpdate(
-            { 'code': req.params.tripCode },
-            {
-                code: req.body.code,
-                name: req.body.name,
-                length: req.body.length,
-                start: req.body.start,
-                resort: req.body.resort,
-                perPerson: req.body.perPerson,
-                image: req.body.image,
-                description: req.body.description
-            }
-        )
-        .exec();
-
-    if (!q) {
-        // Database returned no data
+    getUser(req, res, 
+        (req, res) => {
+            Model
+    .findOneAndUpdate({'code': req.params.tripCode }, {
+        code: req.body.code,
+        name: req.body.name,
+        length: req.body.length,
+        start: req.body.start,
+        resort: req.body.resort,
+        perPerson: req.body.perPerson,
+        image: req.body.image,
+        description: req.body.description
+    }, { new: true })
+    .then(trip => {
+        if (!trip) {
+            return res
+                .status(404)
+                .send({
+                    message: "Trip not found with code " + req.params.tripCode
+                });
+        }
+        res.send(trip);
+    }).catch(err => {
+        if (err.kind === 'ObjectId') {
+            return res
+                .status(404)
+                .send({
+                    message: 'Trip not found with code ' + req.params.tripCode
+                });
+        }
         return res
-            .status(400)
-            .json({ message: "Error: Trip not found or could not be updated" });
-    } else {
-        // Return resulting updated trip
-        return res
-            .status(201)
-            .json({ message: "Trip updated successfully", trip: q });
-    }
-
-    // Uncomment the following line to show results of operation
-    // on the console
-    // console.log(q);
-};
-
+            .status(500)
+            .json(err);
+    });
+});
+}
 
 module.exports = {
     tripsList,
