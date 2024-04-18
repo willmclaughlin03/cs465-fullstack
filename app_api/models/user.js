@@ -37,4 +37,4 @@ userSchema.methods.generateJwt = function() {
   }, process.env.JWT_SECRET); // DO NOT KEEP YOUR SECRET IN THE CODE!
 };
 
-mongoose.model('User', userSchema); // 'User' is the model name, you can use any name you prefer
+module.exports = mongoose.model('users', userSchema); // 'User' is the model name, you can use any name you prefer
